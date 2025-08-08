@@ -1,19 +1,44 @@
+import { db } from '../db';
+import { usersTable, accountsTable } from '../db/schema';
 import { type CreateUserInput, type User } from '../schema';
 
-export async function createUser(input: CreateUserInput): Promise<User> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new user (member/management/admin) and their savings account.
-    // Should validate unique username/email, create user record, and create corresponding savings account.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
-        username: input.username,
-        email: input.email,
-        full_name: input.full_name,
-        phone: input.phone || null,
-        address: input.address || null,
-        role: input.role,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as User);
-}
+export const createUser = async (input: CreateUserInput): Promise<User> => {
+  try {
+    // Start transaction to ensure both user and account are created together
+    const result = await db.transaction(async (tx) => {
+      // Insert user record
+      const userResult = await tx.insert(usersTable)
+        .values({
+          username: input.username,
+          email: input.email,
+          full_name: input.full_name,
+          phone: input.phone,
+          address: input.address,
+          role: input.role
+        })
+        .returning()
+        .execute();
+
+      const user = userResult[0];
+
+      // Generate unique account number (simple format: ACC + user_id padded to 6 digits)
+      const account_number = `ACC${user.id.toString().padStart(6, '0')}`;
+
+      // Create corresponding savings account for the user
+      await tx.insert(accountsTable)
+        .values({
+          user_id: user.id,
+          account_number: account_number,
+          balance: '0.00' // Start with zero balance
+        })
+        .execute();
+
+      return user;
+    });
+
+    return result;
+  } catch (error) {
+    console.error('User creation failed:', error);
+    throw error;
+  }
+};

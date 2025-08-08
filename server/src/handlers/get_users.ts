@@ -1,8 +1,19 @@
+import { db } from '../db';
+import { usersTable } from '../db/schema';
 import { type User } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function getUsers(): Promise<User[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all active users for management/admin view.
-    // Should return users with appropriate filtering based on caller's role.
-    return Promise.resolve([]);
-}
+export const getUsers = async (): Promise<User[]> => {
+  try {
+    // Fetch all active users
+    const results = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.is_active, true))
+      .execute();
+
+    return results;
+  } catch (error) {
+    console.error('Failed to fetch users:', error);
+    throw error;
+  }
+};
